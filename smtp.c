@@ -88,19 +88,17 @@ void smtp(FILE *client, const char *dbfile)
             } else if (strlen(line) < 12) {
                 RESPOND(client, 501, "syntax error");
             } else {
-                /*
                 UserInfo *rcpt_user = parserUseInfo(line);
                 if(DEBUG){
                     printf("username=%s  domain=%s\n" , rcpt_user->username , rcpt_user->domain);
                 }
-                //非本机域名
-                if(strcmp(rcpt_user->domain,SERVER_DOMAIN)!=0){
-                    char msg[256];
-                    snprintf(msg, 256 , "domain :'%s' not support ;\n server domain is : '%s'" ,rcpt_user->domain , SERVER_DOMAIN);
-                    RESPOND(client, 500, msg);
-                    continue;
-                }
-                 */
+//                //非本机域名
+//                if(strcmp(rcpt_user->domain,SERVER_DOMAIN)!=0){
+//                    char msg[256];
+//                    snprintf(msg, 256 , "domain :'%s' not support ;\n server domain is : '%s'" ,rcpt_user->domain , SERVER_DOMAIN);
+//                    RESPOND(client, 500, msg);
+//                    continue;
+//                }
                 recipient_push(&recipients, line + 9);
                 RESPOND(client, 250, "OK");
             }
