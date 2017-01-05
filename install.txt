@@ -1,0 +1,4 @@
+环境 ubuntu16
+依赖 sqlite3
+apt install sqlite3
+apt install libsqlite3-dev
