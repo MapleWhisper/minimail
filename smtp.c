@@ -5,8 +5,7 @@
 #include "database.h"
 #include "smtp.h"
 #include "server.h"
-
-
+#include "base64.h"
 
 
 void smtp_handler(FILE *client, void *arg)
@@ -33,10 +32,13 @@ void smtp(FILE *client, const char *dbfile)
     }
 
     char from[512] = {0};
+    UserInfo *userInfo = NULL;
     struct recipient *recipients = NULL;
+    int user_auth_pass = 0;
     while (!feof(client)) {
         char line[512];
         fgets(line, sizeof(line), client);
+
         if(DEBUG){
             printf("SMTP request : %s\n",line);
         }
@@ -56,33 +58,67 @@ void smtp(FILE *client, const char *dbfile)
             fprintf(client, "%d%s\r\n", 250, " 8BITMIME");
         }
         else if (strcmp(command, "MAIL") == 0) {
+            if(!user_auth_pass){
+                RESPOND(client, 500 ,"auth first");
+                continue;
+            }
             strcpy(from, line);
 
             RESPOND(client, 250, "OK");
         } else if(strcmp(command,"AUTH")==0){
-            if(strcmp(line+5,"LOGIN\r\n")==0){
+            remove_line_break(line);
+            if(strcmp(line+5,"LOGIN")==0){
+                // auth login
                 //进入 验证状态
-                //输入用户密码
+                //输入用户名
                 auth_status = 1;
                 RESPOND(client,334,"VXNlcm5hbWU6");
             }else{
+                // auth plain
                 RESPOND(client,235,"Authentication successful");
             }
-
-
         } else if (auth_status){
+            remove_line_break(line);
             if(auth_status == 1){
+                //判断用户
+                char user[128] ={0};
+                base64_decode(line,user);
+                get_word(user, user);
+                if(strlen(user)<=1){
+                    RESPOND(client,535,"user not found");
+                    continue;
+                }
+                userInfo = database_get_user(&db ,user);
+                if(userInfo==NULL){
+                    RESPOND(client,535,"user not found");
+                    continue;
+                }
                 //发送密码
                 RESPOND(client,334,"UGFzc3dvcmQ6");
                 auth_status = 2;
 
             }else if(auth_status == 2){
-                //验证成功
-                RESPOND(client,235,"Authentication successful");
-                auth_status = 0;
+                if(userInfo==NULL){
+                    auth_status = 0;
+                    RESPOND(client,535,"authentication failed");
+                    continue;
+                }
+                char pwd[128] = {0};
+                base64_decode(line,pwd);
+                if(strcmp(userInfo->password , pwd)==0){
+                    //验证成功
+                    RESPOND(client,235,"Authentication successful");
+                    user_auth_pass = 1;
+                    auth_status = 0;
+                }else{
+                    RESPOND(client,535,"authentication failed , password invalid");
+                }
             }
         } else if (strcmp(command, "RCPT") == 0) {
-
+            if(!user_auth_pass){
+                RESPOND(client, 500 ,"auth first");
+                continue;
+            }
             if (!from[0]) {
                 RESPOND(client, 503, "bad sequence");
             } else if (strlen(line) < 12) {
@@ -104,7 +140,10 @@ void smtp(FILE *client, const char *dbfile)
             }
 
         } else if (strcmp(command, "DATA") == 0) {
-
+            if(!user_auth_pass){
+                RESPOND(client, 500 ,"auth first");
+                continue;
+            }
             RESPOND(client, 354, "end with .");
             size_t size = 4096, fill = 0;
             char *content = malloc(size);

@@ -27,6 +27,9 @@ static const char *SQL_DELETE =
 static const  char *SQL_SAVE_USER =
     "INSERT INTO user(username , password) VALUES (? , ?)";
 
+static const  char *SQL_GET_USER =
+     "SELECT id, username ,password FROM user WHERE username = ?";
+
 
 
 int database_open(struct database *db, const char *file)
@@ -38,6 +41,7 @@ int database_open(struct database *db, const char *file)
     CHECK(db, sqlite3_prepare_v2(db->db, SQL_LIST, -1, &db->list, NULL), -1);
     CHECK(db, sqlite3_prepare_v2(db->db, SQL_DELETE, -1, &db->del, NULL), -1);
     CHECK(db, sqlite3_prepare_v2(db->db, SQL_SAVE_USER, -1, &db->save_user, NULL), -1);
+    CHECK(db, sqlite3_prepare_v2(db->db, SQL_GET_USER, -1, &db->get_user, NULL), -1);
     return 0;
 }
 
@@ -55,12 +59,30 @@ int database_send(struct database *db, const char *user, const char *message)
     return sqlite3_step(db->send) == SQLITE_ROW ? 0 : -1;
 }
 
+UserInfo * database_get_user(struct database *db, const char *username)
+{
+
+    CHECK(db, sqlite3_reset(db->get_user), NULL);
+    CHECK(db, sqlite3_bind_text(db->get_user, 1, username, -1, SQLITE_TRANSIENT), NULL);
+    UserInfo *userInfo =NULL ;
+    while(sqlite3_step(db->get_user) == SQLITE_ROW){
+        if(userInfo == NULL){
+            userInfo = malloc(sizeof(UserInfo));
+        }
+        strcpy(userInfo->username , sqlite3_column_text(db->get_user,1));
+        strcpy(userInfo->password , sqlite3_column_text(db->get_user,2));
+    }
+    return userInfo;
+}
+
 int database_save_user(struct database *db, UserInfo *userInfo)
 {
-    CHECK(db, sqlite3_reset(db->send), -1);
-    CHECK(db, sqlite3_bind_text(db->send, 1, userInfo->username, -1, SQLITE_TRANSIENT), -1);
-    CHECK(db, sqlite3_bind_text(db->send, 2, userInfo->password, -1, SQLITE_TRANSIENT), -1);
-    return sqlite3_step(db->send) == SQLITE_ROW ? 0 : -1;
+
+
+    CHECK(db, sqlite3_reset(db->save_user), -1);
+    CHECK(db, sqlite3_bind_text(db->save_user, 1, userInfo->username, -1, SQLITE_TRANSIENT), -1);
+    CHECK(db, sqlite3_bind_text(db->save_user, 2, userInfo->password, -1, SQLITE_TRANSIENT), -1);
+    return sqlite3_step(db->save_user) == SQLITE_ROW ? 0 : -1;
 }
 
 struct message *

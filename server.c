@@ -74,6 +74,13 @@ int server_start(struct server *server) {
     addr.sin_port = htons(server->port);
     if ((server->fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         ERROR("%s", "could not create socket");
+
+    int flag=1,len=sizeof(int);
+    if( setsockopt(server->fd, SOL_SOCKET, SO_REUSEADDR, &flag, len) == -1) {
+        perror("setsockopt");
+        return 0;
+    }
+
     if (bind(server->fd, (void *) &addr, sizeof(addr)) != 0)
         ERROR("%s", "could not bind");
     if (listen(server->fd, 1024) != 0)
@@ -106,10 +113,12 @@ UserInfo *parserUseInfo(char *line) {
                 while(line[i]!='@' && i<line_len){
                     username[u_idx++]=line[i++];
                 }
+                username[u_idx]= '\0';
                 i++;
                 while(line[i]!='>' && i<line_len){
                     domain[d_idx++]=line[i++];
                 }
+                domain[d_idx] = '\0';
             }
         }
     }
@@ -183,4 +192,25 @@ int strsplit (const char *str, char *parts[], const char *delimiter)
     for (int j = 0; j < i; j++)
         free(parts[j]);
     return -1;
+}
+
+void remove_line_break(char *line) {
+    if(line==NULL || strlen(line)<=1){
+        return;
+    }
+    size_t  line_len = strlen(line);
+    if (line[line_len - 1] == '\n' && line[line_len - 2] == '\r') {
+        line[line_len - 2] = '\0';
+    }
+
+}
+
+void get_word(char *src, char *output) {
+    if(src == NULL || output == NULL){
+        return;
+    }
+    char *a = src, *b = output;
+    while (isalnum(*a))
+        *(b++) = *(a++);
+    *b = '\0';
 }

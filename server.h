@@ -43,3 +43,7 @@ int server_start(struct server *server);
 char *strupr(char *str , size_t len);
 
 int strsplit (const char *str, char *parts[], const char *delimiter);
+
+void remove_line_break(char *line);
+
+void get_word(char *src, char *output);

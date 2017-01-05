@@ -9,6 +9,7 @@ struct database {
     sqlite3_stmt *list;
     sqlite3_stmt *del;
     sqlite3_stmt *save_user;
+    sqlite3_stmt *get_user;
 };
 
 struct message {
@@ -22,6 +23,9 @@ int database_open(struct database *db, const char *file);
 int database_close(struct database *db);
 
 int database_send(struct database *db, const char *user, const char *message);
-int database_save_user(struct database *db, UserInfo *userInfo);
+
 struct message *database_list(struct database *db, const char *user);
 int database_delete(struct database *db, int id);
+
+int database_save_user(struct database *db, UserInfo *userInfo);
+UserInfo * database_get_user(struct database *db, const char *username);

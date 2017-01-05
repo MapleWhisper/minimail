@@ -27,7 +27,10 @@ void pop3(FILE *client, const char *dbfile)
     }
 
     char user[512] = {0};
+    char pwd[512] = {0};
     struct message *messages = NULL;
+    UserInfo *userInfo = NULL;
+    int user_auth_pass = 0;
     while (!feof(client)) {
         char line[512]="";
         char *f ;
@@ -42,18 +45,34 @@ void pop3(FILE *client, const char *dbfile)
         if (strcmp(command, "USER") == 0) {
 
             if (strlen(line) > 5) {
-                char *a = line + 5, *b = user;
-                while (isalnum(*a))
-                    *(b++) = *(a++);
-                *b = '\0';
+                get_word(line+5 , user);
                 RESPOND(client, "%s", "+OK");
             } else {
                 RESPOND(client, "%s", "-ERR");
             }
-            messages = database_list(&db, user);
+            userInfo = database_get_user(&db , user);
+            if(userInfo == NULL){
+                RESPOND(client, "%s","-ERR user not found");
+            }else{
+                messages = database_list(&db, user);
+            }
         } else if (strcmp(command, "PASS") == 0) {
+            if(userInfo == NULL){
+                RESPOND(client, "%s","-ERR user not found");
+                continue;
+            }
+            if (strlen(line) > 5) {
+                get_word(line+5 , pwd);
 
-            RESPOND(client, "%s", "+OK"); // don't care
+                if(strlen(pwd)>=1 && strcmp(pwd, userInfo->password)==0){
+                    user_auth_pass = 1;
+                    RESPOND(client, "%s", "+OK"); // don't care
+                }else{
+                    RESPOND(client, "%s", "-ERR auth fail"); // don't care
+                }
+
+            }
+
         } else if (strcmp(command, "STAT") == 0) {
 
             int count = 0, size = 0;
@@ -63,7 +82,10 @@ void pop3(FILE *client, const char *dbfile)
             }
             RESPOND(client, "+OK %d %d", count, size);
         } else if (strcmp(command, "LIST") == 0) {
-
+            if(!user_auth_pass){
+                RESPOND(client, "%s","-ERR Command not valid in this state");
+                continue;
+            }
             RESPOND(client, "%s", "+OK");
             int i = 1;
             for (struct message *m = messages; m; m = m->next ,i++){
@@ -73,7 +95,10 @@ void pop3(FILE *client, const char *dbfile)
             RESPOND(client, "%s", ".");
         }
         else if (strcmp(command, "UIDL") == 0) {
-
+            if(!user_auth_pass){
+                RESPOND(client, "%s","-ERR Command not valid in this state");
+                continue;
+            }
             int index = atoi(line + 4);
             RESPOND(client, "%s", "+OK");
             int i = 1;
@@ -84,7 +109,10 @@ void pop3(FILE *client, const char *dbfile)
             RESPOND(client, "%s", ".");
         }
         else if (strcmp(command, "RETR") == 0) {
-
+            if(!user_auth_pass){
+                RESPOND(client, "%s","-ERR Command not valid in this state");
+                continue;
+            }
             int id = atoi(line + 4);
             int found = 0;
             int index = 1;
@@ -96,7 +124,10 @@ void pop3(FILE *client, const char *dbfile)
                 }
             RESPOND(client, "%s", found ? "." : "-ERR");
         } else if (strcmp(command, "DELE") == 0) {
-
+            if(!user_auth_pass){
+                RESPOND(client, "%s","-ERR Command not valid in this state");
+                continue;
+            }
             int id = atoi(line + 4);
             int found = 0;
             for (struct message  *m = messages; m; m = m->next) {
